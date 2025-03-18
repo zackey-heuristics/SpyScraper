@@ -16,11 +16,10 @@ setup(
         ],
     },
     install_requires=[
-        "whois",
         "phonenumbers",
         "bs4",
         "python-whois",
-        "requests"
+        "httpx",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

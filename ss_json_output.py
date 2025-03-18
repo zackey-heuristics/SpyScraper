@@ -24,13 +24,20 @@ import random
 import re
 import sys
 
+import httpx
 import whois
 import phonenumbers
 from bs4 import BeautifulSoup
 
-import lib.formats
-from lib.requests import Requests
 
+async def send_request(url: str, headers: dict[str, str], timeout: int=5) -> httpx.Response:
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response
+    except httpx.HTTPStatusError as h:
+        sys.exit(1)
 
 
 async def extract_emails(url: str, useragents: list[str]) -> list:
@@ -39,8 +46,8 @@ async def extract_emails(url: str, useragents: list[str]) -> list:
             "User-Agent": random.choice(useragents)
         }
 
-        response = await Requests(url, headers=headers).sender()
-        email_regex = lib.formats.EMAIL
+        response = await send_request(url, headers)
+        email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
         emails = re.findall(email_regex, response.text)
 
         return emails
@@ -55,7 +62,7 @@ async def extract_href(url: str, useragents: list[str]) -> list:
             "User-Agent": random.choice(useragents)
         }
         
-        response = await Requests(url, headers=headers).sender()
+        response = await send_request(url, headers)
         soup = BeautifulSoup(response.content, 'html.parser')
         links = soup.find_all('a')
         hrefs = [link.get('href') for link in links]
@@ -71,7 +78,7 @@ async def author_infos(url: str, useragents: list[str]):
             "User-Agent": random.choice(useragents)
         }
 
-        response = await Requests(url, headers=headers).sender()
+        response = await send_request(url, headers)
 
         soup = BeautifulSoup(response.text, 'html.parser')
         author_element = soup.find('meta', {'name': 'author'})
@@ -90,8 +97,8 @@ async def extract_phone(url: str, useragents: list[str]) -> list:
             "User-Agent": random.choice(useragents)
         }
         
-        response = await Requests(url, headers=headers).sender()
-        phone_regex = lib.formats.PHONE_NUMBER
+        response = await send_request(url, headers)
+        phone_regex = r"\b(?:\+?(\d{1,3}))?[-. (]*(\d{3})[-. )]*(\d{3})[-. ]*(\d{4})\b"
         phone_numbers = re.findall(phone_regex, response.text)
         
         unique_phone_numbers = list(set(phone_numbers))
@@ -165,9 +172,13 @@ async def servers_infos(url: str) -> list:
         return []
 
 
-async def extract_location(url: str) -> list:
+async def extract_location(url: str, useragents: list[str]) -> list:
     try:
-        response = await Requests(url).sender()
+        headers = {
+            "User-Agent": random.choice(useragents)
+        }
+        
+        response = await send_request(url, headers)
         
         soup = BeautifulSoup(response.text, 'html.parser')
         locations = []
@@ -216,7 +227,7 @@ async def maincore():
     phones = await extract_phone(target_url, useragents)
     creation_update_info = await creation_update(target_url)
     servers = await servers_infos(target_url)
-    locations = await extract_location(target_url)
+    locations = await extract_location(target_url, useragents)
     
     result = {
         "target_url": target_url,
@@ -237,8 +248,7 @@ async def maincore():
 
 
 def main():
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(maincore())
+    asyncio.run(maincore())
 
 
 if __name__ == "__main__":
