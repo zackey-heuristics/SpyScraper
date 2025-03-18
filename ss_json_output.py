@@ -216,8 +216,12 @@ async def maincore():
     
     # Check the user-agent
     if args.useragent == "random":
-        with open("useragents.txt", "r") as useragents_file:
-            useragents = useragents_file.read().split('\n')
+        try:
+            response = await send_request("https://raw.githubusercontent.com/zackey-heuristics/SpyScraper/refs/heads/master/useragents.txt", {})
+        except:
+            print("Failed to get the user-agent list.", file=sys.stderr)
+            sys.exit(1)
+        useragents = response.text.splitlines()
     else:
         useragents = [args.useragent]
     
